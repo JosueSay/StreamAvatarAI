@@ -1,0 +1,15 @@
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.git
+.gitignore
+.env
+.env.example
+path.log
+.vscode
+.idea
+*.swp
+*.swo

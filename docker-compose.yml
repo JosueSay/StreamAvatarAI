@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: obs-llama-app
+    env_file:
+      - .env
+    working_dir: /app
+    volumes:
+      - .:/app
+
+      - ${LLAMA_MODELS_HOST_DIR}:/models
+
+    # Si tu app expone un puerto HTTP, usas APP_PORT
+    ports:
+      - "${APP_PORT:-8000}:${APP_PORT:-8000}"
+
+    # Para que no muera por defecto; el CMD del Dockerfile abre un bash
+    tty: true
