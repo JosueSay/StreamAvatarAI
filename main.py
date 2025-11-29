@@ -1,23 +1,8 @@
-from conn import createObsConnection
+from pipeline import runPipeline
 
 
 def main():
-    try:
-        ws, config = createObsConnection()
-    except Exception as error:
-        print("\n⚠ Ejecución abortada por un error de configuración o conexión\n")
-        print(f"Detalle: {error}\n")
-        return
-
-    # print("Config usada:")
-    # for key, value in config.items():
-    #     print(f"  {key}: {value}")
-
-    try:
-        ws.disconnect()
-        print("\nConexión con OBS cerrada correctamente")
-    except Exception as error:
-        print("\n⚠ Error al cerrar la conexión con OBS:", error)
+    runPipeline()
 
 
 if __name__ == "__main__":
