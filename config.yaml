@@ -1,2 +1,34 @@
 app:
   path_ip_file: "path.log"
+
+  # rutas base para runtime
+  data_dir: "data"
+  frames_subdir: "frames"
+  history_subdir: "history"
+  history_file: "history.txt"
+  audio_subdir: "audio"
+
+  # parámetros del pipeline
+  frames_per_cycle: 5               # cuántos frames por ciclo
+  capture_interval_seconds: 60      # cada cuántos segundos se corre el ciclo
+  max_history_messages: 6           # cuántos mensajes de texto guardar
+
+obs:
+  # de dónde capturar:
+  # - "program_scene": usa la escena actual del programa (lo que se está emitiendo)
+  # - "source": usar un source específico por nombre
+  capture_source_mode: "program_scene"
+  capture_source_name: ""           # solo se usa si capture_source_mode == "source"
+
+  # resolución de captura
+  capture_width: 1280
+  capture_height: 720
+
+llm:
+  prompt_base: |
+    Eres un avatar IA que comenta lo que ve en el stream.
+    Debes analizar las imágenes capturadas del OBS y responder de forma natural,
+    entretenida y descriptiva, como si fueras un streamer comentando lo que está
+    pasando en pantalla.
+
+    Si no entiendes algo, descríbelo igualmente con creatividad.
