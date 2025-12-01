@@ -13,3 +13,6 @@ path.log
 .idea
 *.swp
 *.swo
+*.egg-info
+dist/
+build/
