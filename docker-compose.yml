@@ -1,4 +1,17 @@
 services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-runtime
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
   app:
     build:
       context: .
@@ -9,14 +22,16 @@ services:
     working_dir: /app
     volumes:
       - .:/app
-      - ${LLAMA_MODELS_HOST_DIR}:/models
     ports:
       - "${APP_PORT:-8000}:${APP_PORT:-8000}"
-
-    # Habilitar GPU
+    depends_on:
+      - ollama
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-
     tty: true
+
+volumes:
+  ollama_models:
+    driver: local
