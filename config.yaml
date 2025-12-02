@@ -8,6 +8,10 @@ app:
   history_file: "history.txt"
   audio_subdir: "audio"
 
+  # parámetros logs
+  logs_subdir: logs
+  llm_log_file: llm_calls.log
+
   # parámetros del pipeline
   frames_per_cycle: 5               # cuántos frames por ciclo
   capture_interval_seconds: 60      # cada cuántos segundos se corre el ciclo
