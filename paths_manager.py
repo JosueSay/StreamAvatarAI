@@ -13,16 +13,23 @@ def getAppPaths():
     audio_dir = os.path.join(base, app_cfg["audio_subdir"])
     history_file = os.path.join(history_dir, app_cfg["history_file"])
 
+    # logs
+    logs_dir = os.path.join(base, app_cfg["logs_subdir"])
+    llm_log_file = os.path.join(logs_dir, app_cfg["llm_log_file"])
+
     # crear carpetas necesarias
     os.makedirs(frames_dir, exist_ok=True)
     os.makedirs(history_dir, exist_ok=True)
     os.makedirs(audio_dir, exist_ok=True)
+    os.makedirs(logs_dir, exist_ok=True)
 
     return {
         "frames_dir": frames_dir,
         "history_dir": history_dir,
         "history_file": history_file,
         "audio_dir": audio_dir,
+        "logs_dir": logs_dir,
+        "llm_log_file": llm_log_file,
     }
 
 
