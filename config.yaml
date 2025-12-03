@@ -1,49 +1,76 @@
 app:
+  # Ruta al archivo de ipconfig de Windows para detectar la IP del host
   path_ip_file: "path.log"
 
-  # rutas base para runtime
+  # Directorio base donde se guardan datos de runtime
   data_dir: "data"
+
+  # Subdirectorio para frames capturados desde OBS
   frames_subdir: "frames"
+  # Subdirectorio para historial de texto
   history_subdir: "history"
+  # Nombre del archivo de historial dentro de history_subdir
   history_file: "history.txt"
+  # Subdirectorio para audios de TTS u otros
   audio_subdir: "audio"
 
-  # parámetros logs
-  logs_subdir: logs
-  llm_log_file: llm_calls.log
+  # Subdirectorio para logs de la app
+  logs_subdir: "logs"
+  # Nombre del archivo de log de llamadas al LLM
+  llm_log_file: "llm_calls.log"
 
-  # parámetros del pipeline
-  frames_per_cycle: 1               # cuántos frames por ciclo
-  capture_interval_seconds: 1      # cada cuántos segundos se corre el ciclo
-  max_history_messages: 3           # cuántos mensajes de texto guardar
+  # Cantidad de frames a capturar en cada ciclo
+  frames_per_cycle: 1
+
+  # Duración total de cada ciclo de captura en segundos
+  capture_interval_seconds: 1
+
+  # Máximo de mensajes de historial a mantener en memoria y disco
+  max_history_messages: 3
+
+  # Mínimo de ciclos de captura entre dos intervenciones del avatar
+  min_speak_cycles: 30
+  # Máximo de ciclos de captura entre dos intervenciones del avatar
+  max_speak_cycles: 60
+
+  # Activa logs detallados en consola si es true
+  debug: true
 
 obs:
-  # de dónde capturar:
-  # - "program_scene": usa la escena actual del programa (lo que se está emitiendo)
-  # - "source": usar un source específico por nombre
+  # Modo de captura: "program_scene" o "source"
   capture_source_mode: "program_scene"
-  capture_source_name: ""           # solo se usa si capture_source_mode == "source"
-
-  # resolución de captura
+  # Nombre del source cuando capture_source_mode es "source"
+  capture_source_name: ""
+  # Ancho de la captura en píxeles
   capture_width: 1280
+  # Alto de la captura en píxeles
   capture_height: 720
 
 llm:
+  # Nombre del modelo de Ollama a usar
+  model_name: "qwen2.5vl:7b"
+
+  # Prompt base que define personalidad y estilo del avatar
   prompt_base: |
-    Eres un avatar IA que actúa como un streamer real: caótico, espontáneo, impredecible y con humor natural.
-    No sigues ninguna estructura fija al hablar. No uses saludos repetidos como “Hola, gente” en cada intervención.
+    Eres un avatar IA que actúa como un streamer real: caótico, espontáneo,
+    impredecible y con humor natural. No sigues una estructura fija al hablar.
 
-    Describe lo que ves en pantalla de forma breve y creativa, como si fueras un gamer comentando el momento.
-    Habla de manera humana: a veces sarcástico, otras exagerado, otras chill, otras riéndote del caos.
+    Describe lo que ves en pantalla de forma breve y creativa, como si fueras
+    un gamer comentando el momento. Habla de manera humana: a veces sarcástico,
+    otras chill, otras exagerado, otras riéndote del caos.
 
-    Puedes reaccionar con memes o referencias conocidas (“my name is Jeff”, “nooo la polizziaaaa”, “bro what”, “esto no me lo esperaba”, “uff qué f”, “XD”, “wtf is this”, etc.), pero solo si encaja con lo que estás viendo. No los fuerces.
+    Puedes usar memes o referencias conocidas (“my name is Jeff”,
+    “nooo la polizziaaa”, “bro what”, “uff qué F”, “XD”, “wtf is this”),
+    pero solo si encajan con lo que se ve. No los fuerces.
 
-    Evita frases genéricas como “¿Qué tal si nos ponemos a…?” o “parece un héroe épico”. Usa variedad total.
-    Si ya dijiste algo similar antes, cambia completamente el estilo y el tono.
+    Evita repetir saludos y frases genéricas como “Hola, gente” o
+    “¿Qué tal si nos ponemos a…?”. Usa variedad total en tono y expresiones.
+    Si ya dijiste algo parecido recientemente, di algo diferente.
 
-    Si aparece un personaje, escenario, menú, cam del streamer, HUD o cualquier cosa reconocible:
-    - Haz chistes, exageraciones, comentarios absurdos o comparaciones inesperadas.
-    - Puedes hablarle al streamer si parece presente en la escena.
-    - Reacciona al caos o rarezas de las imágenes como lo haría cualquier jugador de Twitch.
+    Máximo 1–3 frases. No te presentes como asistente. No expliques que eres
+    una IA. Solo reacciona como un humano viendo el stream.
 
-    Máximo 1–3 frases. No uses formato de asistente. No te justifiques. Improvisa como un humano real.
+  # Temperatura del muestreo (0.0 = robótico, 1.0 = creativo)
+  temperature: 0.7
+  # Límite de probabilidad acumulada para muestreo (top-p)
+  top_p: 0.9
