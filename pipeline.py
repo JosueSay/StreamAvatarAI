@@ -1,19 +1,21 @@
-import random
-from typing import Optional
 import os
+import random
+
 from conn import createObsConnection
 from paths_manager import getAppPaths, getAppParams
 from history_manager import saveHistory
-from capture_obs_frame import captureFrames
-from llm_client import run_llm
+from capture_obs_frame import captureFrames, isDebugEnabled
+from llm_client import runLlm
 
 
-def sendToTts(text):
+def sendToTts(text: str):
+    # Envía la respuesta generada por el LLM al sistema de TTS (por ahora solo imprime).
     print("\nEnviando respuesta a TTS:")
     print(f"\t- Texto: {text[:120]}...")
 
 
-def runPipeline(model_name: Optional[str] = None):
+def runPipeline():
+    # Orquesta el ciclo principal: captura frames, llama al LLM y maneja el historial.
     paths = getAppPaths()
     params = getAppParams()
 
@@ -25,6 +27,8 @@ def runPipeline(model_name: Optional[str] = None):
     frames_per_cycle = params["frames_per_cycle"]
     capture_interval_seconds = params["capture_interval_seconds"]
     max_history_messages = params["max_history_messages"]
+    min_speak_cycles = params["min_speak_cycles"]
+    max_speak_cycles = params["max_speak_cycles"]
 
     prompt_base = params["prompt_base"].strip()
 
@@ -37,68 +41,66 @@ def runPipeline(model_name: Optional[str] = None):
     print(f"\t- Frames por ciclo: {frames_per_cycle}")
     print(f"\t- Intervalo total de captura por ciclo: {capture_interval_seconds} segundos")
     print(f"\t- Máximo de mensajes en historial: {max_history_messages}")
+    print(f"\t- Ciclos para hablar (min, max): ({min_speak_cycles}, {max_speak_cycles})")
 
-    # --- limpiar frames de corridas anteriores ---
     try:
         for fname in os.listdir(frames_dir):
             fpath = os.path.join(frames_dir, fname)
             if os.path.isfile(fpath):
                 os.remove(fpath)
-        print(f"\t- Frames previos eliminados en: {frames_dir}")
-    except Exception as e:
-        print(f"\t[!] No se pudieron limpiar los frames: {e}")
+        if isDebugEnabled():
+            print(f"\t- Frames previos eliminados en: {frames_dir}")
+    except Exception as error:
+        print(f"\t[!] No se pudieron limpiar los frames: {error}")
 
-    # --- limpiar archivos de corridas anteriores ---
     try:
         with open(history_file, "w", encoding="utf-8"):
             pass
-        print(f"\t- Historial reiniciado: {history_file}")
-    except Exception as e:
-        print(f"\t[!] No se pudo reiniciar el historial ({history_file}): {e}")
+        if isDebugEnabled():
+            print(f"\t- Historial reiniciado: {history_file}")
+    except Exception as error:
+        print(f"\t[!] No se pudo reiniciar el historial ({history_file}): {error}")
 
     try:
         with open(llm_log_file, "w", encoding="utf-8"):
             pass
-        print(f"\t- Log de LLM reiniciado: {llm_log_file}")
-    except Exception as e:
-        print(f"\t[!] No se pudo reiniciar el log LLM ({llm_log_file}): {e}")
+        if isDebugEnabled():
+            print(f"\t- Log de LLM reiniciado: {llm_log_file}")
+    except Exception as error:
+        print(f"\t[!] No se pudo reiniciar el log LLM ({llm_log_file}): {error}")
 
-    # historial vacío desde el inicio
-    history_messages = []
+    history_messages: list[str] = []
     print(f"\t- Mensajes iniciales en historial: {len(history_messages)}")
 
     ws, _ = createObsConnection()
 
-    # --- lógica de “vida”: no hablar siempre ---
-    min_speak_cycles = 30
-    max_speak_cycles = 60
-
-    def next_gap():
+    def nextGap() -> int:
+        # Devuelve el número de ciclos hasta la próxima intervención del avatar.
         return random.randint(min_speak_cycles, max_speak_cycles)
 
     cycles_until_talk = 0
-
     running = True
 
     try:
         while running:
-            print("\n======================== NUEVO CICLO ========================")
+            if isDebugEnabled():
+                print("\n======================== NUEVO CICLO ========================")
 
             frame_paths = captureFrames(ws, frames_dir, frames_per_cycle, capture_interval_seconds)
 
             if cycles_until_talk > 0:
                 cycles_until_talk -= 1
-                print(f"\t- Ciclo silencioso. Faltan {cycles_until_talk} ciclos para hablar de nuevo.")
+                if isDebugEnabled():
+                    print(f"\t- Ciclo silencioso. Faltan {cycles_until_talk} ciclos para hablar de nuevo.")
                 continue
 
             prompt = prompt_base
 
-            response = run_llm(
+            response = runLlm(
                 prompt_base=prompt,
                 images_paths=frame_paths,
                 history_messages=history_messages,
                 log_file=llm_log_file,
-                cli_model_name=model_name,
             )
 
             sendToTts(response)
@@ -106,15 +108,15 @@ def runPipeline(model_name: Optional[str] = None):
             history_messages.append(response)
             history_messages = saveHistory(history_file, history_messages, max_history_messages)
 
-            cycles_until_talk = next_gap()
-            print(f"\t- Próxima intervención del avatar en ~{cycles_until_talk} ciclos.")
+            cycles_until_talk = nextGap()
+            if isDebugEnabled():
+                print(f"\t- Próxima intervención del avatar en ~{cycles_until_talk} ciclos.")
 
             del frame_paths
 
     except KeyboardInterrupt:
         print("\nInterrupción del usuario (Ctrl+C). Deteniendo pipeline...")
         running = False
-
     finally:
         print("\nCerrando conexión con OBS...")
         try:
