@@ -111,6 +111,10 @@ def runPipeline():
             cycles_until_talk = nextGap()
             if isDebugEnabled():
                 print(f"\t- Próxima intervención del avatar en ~{cycles_until_talk} ciclos.")
+                
+            else:
+                total_seconds = cycles_until_talk * capture_interval_seconds
+                print(f"\nAvatar en cooldown: hablará de nuevo en {cycles_until_talk} ciclos (~{total_seconds} segundos)\n")
 
             del frame_paths
 

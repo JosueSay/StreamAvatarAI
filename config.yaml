@@ -34,7 +34,7 @@ app:
   max_speak_cycles: 60
 
   # Activa logs detallados en consola si es true
-  debug: true
+  debug: false
 
 obs:
   # Modo de captura: "program_scene" o "source"

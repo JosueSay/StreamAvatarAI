@@ -6,14 +6,9 @@ from pathlib import Path
 import requests
 
 from config_loader import getConfigManager
+from capture_obs_frame import isDebugEnabled
 
 _model_name_cache: str | None = None  # cache interno del nombre de modelo
-
-
-def isDebugEnabled():
-    # Devuelve true si el modo debug está activo en config.app.debug.
-    app_config = getConfigManager().getSection("app")
-    return bool(app_config["debug"])
 
 
 def getOllamaUrl() -> str:
