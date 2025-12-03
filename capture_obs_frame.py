@@ -92,37 +92,61 @@ def captureFrames(ws, frames_dir: str, frames_per_cycle: int, capture_interval_s
     capture_width = obs_config["capture_width"]
     capture_height = obs_config["capture_height"]
 
-    # distribuir las capturas a lo largo del intervalo completo
     if frames_per_cycle <= 0:
         raise ValueError("frames_per_cycle debe ser mayor que 0")
 
+    # repartir las capturas a lo largo de TODO el intervalo
     interval_per_frame = capture_interval_seconds / float(frames_per_cycle)
 
     frame_paths: List[str] = []
 
+    start_time = time.time()
+    print(f"\t- Inicio de captura (timestamp): {start_time:.3f}")
+
     for index in range(frames_per_cycle):
+        frame_start = time.time()
+
         frame_name = f"frame_{index}.png"
         frame_path = os.path.join(frames_dir, frame_name)
 
         print(f"\t- Capturando frame {index + 1}/{frames_per_cycle}...")
 
-        cycle_start = time.time()
-
         source_name = resolveSourceName(ws, capture_source_mode, capture_source_name)
         saveScreenshotFromObs(ws, source_name, capture_width, capture_height, frame_path)
 
+        frame_end = time.time()
+        frame_elapsed = frame_end - frame_start
+        print(f"\t\t- Tiempo de captura del frame: {frame_elapsed:.3f} s")
+
         frame_paths.append(frame_path)
 
-        # esperar hasta el siguiente slot, salvo después del último frame
+        # calcular el momento objetivo para el siguiente frame
         if index < frames_per_cycle - 1:
-            elapsed = time.time() - cycle_start
-            sleep_time = max(interval_per_frame - elapsed, 0)
+            target_time = start_time + (index + 1) * interval_per_frame
+            sleep_time = target_time - time.time()
             if sleep_time > 0:
-                print(f"\t\t- Esperando {sleep_time:.2f} segundos antes del siguiente frame...")
+                print(f"\t\t- Esperando {sleep_time:.3f} s antes del siguiente frame...")
                 time.sleep(sleep_time)
+
+    # ---- aquí forzamos a completar el intervalo total ----
+    now = time.time()
+    elapsed_so_far = now - start_time
+    remaining = capture_interval_seconds - elapsed_so_far
+    if remaining > 0:
+        print(f"\t- Esperando {remaining:.3f} s para completar el intervalo de captura...")
+        time.sleep(remaining)
+
+    end_time = time.time()
+    total_elapsed = end_time - start_time
+    diff = total_elapsed - capture_interval_seconds
 
     print("\t- Frames capturados:")
     for path in frame_paths:
         print(f"\t\t-> {path}")
 
+    print(f"\t- Tiempo total real de captura: {total_elapsed:.3f} s")
+    print(f"\t- Tiempo configurado en YAML: {capture_interval_seconds} s")
+    print(f"\t- Diferencia: {diff:+.3f} s")
+
     return frame_paths
+
