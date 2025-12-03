@@ -1,23 +1,22 @@
 import os
-from config_loader import loadConfig
+from config_loader import getConfigManager
 
 
 def getAppPaths():
-    cfg = loadConfig()
-    app_cfg = cfg["app"]
+    # Construye y asegura las rutas base usadas por la aplicación en runtime.
+    config_manager = getConfigManager()
+    app_cfg = config_manager.getSection("app")
 
-    base = app_cfg["data_dir"]
+    base_dir = app_cfg["data_dir"]
 
-    frames_dir = os.path.join(base, app_cfg["frames_subdir"])
-    history_dir = os.path.join(base, app_cfg["history_subdir"])
-    audio_dir = os.path.join(base, app_cfg["audio_subdir"])
+    frames_dir = os.path.join(base_dir, app_cfg["frames_subdir"])
+    history_dir = os.path.join(base_dir, app_cfg["history_subdir"])
+    audio_dir = os.path.join(base_dir, app_cfg["audio_subdir"])
     history_file = os.path.join(history_dir, app_cfg["history_file"])
 
-    # logs
-    logs_dir = os.path.join(base, app_cfg["logs_subdir"])
+    logs_dir = os.path.join(base_dir, app_cfg["logs_subdir"])
     llm_log_file = os.path.join(logs_dir, app_cfg["llm_log_file"])
 
-    # crear carpetas necesarias
     os.makedirs(frames_dir, exist_ok=True)
     os.makedirs(history_dir, exist_ok=True)
     os.makedirs(audio_dir, exist_ok=True)
@@ -34,15 +33,18 @@ def getAppPaths():
 
 
 def getAppParams():
-    cfg = loadConfig()
-    app_cfg = cfg["app"]
-    llm_cfg = cfg.get("llm", {})
+    # Devuelve parámetros de runtime del pipeline y del LLM leídos desde config.yaml.
+    config_manager = getConfigManager()
+    app_cfg = config_manager.getSection("app")
+    llm_cfg = config_manager.getSection("llm")
 
     return {
         "frames_per_cycle": app_cfg["frames_per_cycle"],
         "capture_interval_seconds": app_cfg["capture_interval_seconds"],
         "max_history_messages": app_cfg["max_history_messages"],
-
-        # parámetros del LLM
-        "prompt_base": llm_cfg.get("prompt_base", "Eres un avatar IA."),
+        "min_speak_cycles": app_cfg["min_speak_cycles"],
+        "max_speak_cycles": app_cfg["max_speak_cycles"],
+        "prompt_base": llm_cfg["prompt_base"],
+        "llm_temperature": llm_cfg["temperature"],
+        "llm_top_p": llm_cfg["top_p"],
     }
