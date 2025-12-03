@@ -1,16 +1,4 @@
-import os
 from typing import List
-
-
-def loadHistory(history_file):
-    # devuelve lista de líneas (respuestas previas)
-    if not os.path.exists(history_file):
-        return []
-
-    with open(history_file, "r", encoding="utf-8") as file:
-        lines = [line.strip() for line in file.readlines() if line.strip()]
-
-    return lines
 
 
 def saveHistory(history_file, messages: List[str], max_history_messages: int):
