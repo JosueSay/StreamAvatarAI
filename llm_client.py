@@ -1,64 +1,60 @@
-import os
 import json
 import base64
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 import requests
 
-# cache interno del modelo para que sea siempre el mismo durante la ejecución
-_MODEL_NAME: Optional[str] = None
+from config_loader import getConfigManager
+
+_model_name_cache: str | None = None  # cache interno del nombre de modelo
 
 
-def _get_ollama_url() -> str:
-    url = os.getenv("OLLAMA_URL")
-    if not url:
-        # solo URL por defecto, NO modelo por defecto
-        url = "http://ollama:11434"
-        print("[!] OLLAMA_URL no está definida, usando http://ollama:11434")
+def isDebugEnabled():
+    # Devuelve true si el modo debug está activo en config.app.debug.
+    app_config = getConfigManager().getSection("app")
+    return bool(app_config["debug"])
+
+
+def getOllamaUrl() -> str:
+    # Obtiene la URL base de Ollama desde la variable de entorno OLLAMA_URL.
+    config_manager = getConfigManager()
+    url = config_manager.requireEnv("OLLAMA_URL")
     return url.rstrip("/")
 
 
-def _resolve_and_cache_model(cli_model_name: Optional[str]) -> str:
-    """
-    Resuelve el modelo UNA sola vez:
-    1) CLI (--model)
-    2) variable de entorno OLLAMA_MODEL
-    Si no hay ninguno, lanza error (no hay modelo por defecto quemado).
-    """
-    global _MODEL_NAME
+def resolveAndCacheModel() -> str:
+    # Resuelve el modelo desde config.llm.model_name y lo cachea para toda la ejecución.
+    global _model_name_cache
 
-    if _MODEL_NAME is not None:
-        return _MODEL_NAME
+    if _model_name_cache is not None:
+        return _model_name_cache
 
-    if cli_model_name:
-        _MODEL_NAME = cli_model_name
-    else:
-        env_model = os.getenv("OLLAMA_MODEL")
-        if env_model:
-            _MODEL_NAME = env_model
-        else:
-            raise RuntimeError(
-                "No se ha definido un modelo para Ollama.\n"
-                "Usa el argumento --model o la variable de entorno OLLAMA_MODEL."
-            )
+    config_manager = getConfigManager()
+    llm_config = config_manager.getSection("llm")
 
-    print(f"[i] Usando modelo LLM: {_MODEL_NAME}")
-    return _MODEL_NAME
+    model_name = llm_config["model_name"]
+    _model_name_cache = model_name
+
+    if isDebugEnabled():
+        print(f"[i] Usando modelo LLM: {model_name}")
+
+    return model_name
 
 
-def _encode_images_as_base64(image_paths: List[str]) -> List[str]:
-    images_b64: List[str] = []
+def encodeImagesAsBase64(image_paths: list[str]) -> list[str]:
+    # Convierte una lista de rutas de imágenes en una lista de strings base64.
+    images_b64: list[str] = []
 
     for path in image_paths:
         img_path = Path(path)
         if not img_path.exists():
-            print(f"[!] La imagen no existe y se omite del request: {img_path}")
+            if isDebugEnabled():
+                print(f"[!] La imagen no existe y se omite del request: {img_path}")
             continue
 
-        with img_path.open("rb") as f:
-            img_bytes = f.read()
+        with img_path.open("rb") as file:
+            img_bytes = file.read()
 
         img_b64 = base64.b64encode(img_bytes).decode("utf-8")
         images_b64.append(img_b64)
@@ -66,38 +62,37 @@ def _encode_images_as_base64(image_paths: List[str]) -> List[str]:
     return images_b64
 
 
-def _call_ollama_generate(
-    model_name: str,
-    prompt: str,
-    image_paths: List[str],
-) -> str:
-    """Llama a Ollama /api/generate con soporte opcional de imágenes."""
-    url = f"{_get_ollama_url()}/api/generate"
+def callOllamaGenerate(model_name: str, prompt: str, image_paths: list[str]) -> str:
+    # Llama a Ollama /api/generate con soporte opcional de imágenes.
+    url = f"{getOllamaUrl()}/api/generate"
 
-    payload: dict = {
+    config_manager = getConfigManager()
+    llm_config = config_manager.getSection("llm")
+
+    payload = {
         "model": model_name,
         "prompt": prompt,
         "stream": False,
         "options": {
-            "temperature": 0.7,
-            "top_p": 0.9,
+            "temperature": llm_config["temperature"],
+            "top_p": llm_config["top_p"],
         },
     }
 
-
     if image_paths:
-        images_b64 = _encode_images_as_base64(image_paths)
+        images_b64 = encodeImagesAsBase64(image_paths)
         if images_b64:
             payload["images"] = images_b64
 
-    print(f"[i] Llamando a Ollama en: {url}")
-    # print(f"[i] Payload: {json.dumps(payload)[:200]}...")
+    if isDebugEnabled():
+        print(f"[i] Llamando a Ollama en: {url}")
+        # print(f"[i] Payload: {json.dumps(payload)[:200]}...")
 
     try:
         resp = requests.post(url, json=payload, timeout=600)
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RequestException as error:
         msg = (
-            f"[ERROR] Error de red al llamar a Ollama: {e}\n"
+            f"[ERROR] Error de red al llamar a Ollama: {error}\n"
             f"       URL: {url}\n"
             f"       ¿Está corriendo el contenedor 'ollama-runtime'?"
         )
@@ -121,15 +116,11 @@ def _call_ollama_generate(
     return data.get("response", "")
 
 
-def _build_prompt(prompt_base: str, history_messages: List[str]) -> str:
-    """
-    Construye el prompt final usando el prompt base del YAML
-    + un resumen simple del historial, obligando a NO repetir.
-    """
+def buildPrompt(prompt_base: str, history_messages: list[str]) -> str:
+    # Construye el prompt final usando el prompt base y el historial reciente del avatar.
     if not history_messages:
         return prompt_base
 
-    # solo los últimos N para no saturar
     recent = history_messages[-6:]
     history_block = "\n".join(f"- {msg}" for msg in recent)
 
@@ -144,26 +135,18 @@ def _build_prompt(prompt_base: str, history_messages: List[str]) -> str:
     )
 
 
-
-def _append_llm_log(
+def appendLlmLog(
     log_file: str,
     model_name: str,
     prompt: str,
-    image_paths: List[str],
+    image_paths: list[str],
     response: str,
 ) -> None:
-    """
-    Log en formato JSONL:
-    - timestamp
-    - modelo
-    - imágenes usadas
-    - prompt enviado
-    - respuesta del modelo
-    """
+    # Escribe un registro JSONL con la llamada al LLM (timestamp, modelo, imágenes, prompt, respuesta).
     entry = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "model": model_name,
-        "images": [str(p) for p in image_paths],
+        "images": [str(path) for path in image_paths],
         "prompt": prompt,
         "response": response,
     }
@@ -171,42 +154,35 @@ def _append_llm_log(
     log_path = Path(log_file)
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with log_path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    with log_path.open("a", encoding="utf-8") as file:
+        file.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
-def run_llm(
+def runLlm(
     prompt_base: str,
-    images_paths: List[str],
-    history_messages: List[str],
+    images_paths: list[str],
+    history_messages: list[str],
     log_file: str,
-    cli_model_name: Optional[str] = None,
 ) -> str:
-    """
-    Punto de entrada desde el pipeline:
-    - Resuelve el modelo (CLI/env, sin valor por defecto).
-    - Construye el prompt con historial.
-    - Llama a Ollama.
-    - Escribe log con imágenes, prompt y respuesta.
-    """
-    model_name = _resolve_and_cache_model(cli_model_name)
-    full_prompt = _build_prompt(prompt_base, history_messages)
+    # Punto de entrada desde el pipeline para invocar al LLM con imágenes, historial y logging.
+    model_name = resolveAndCacheModel()
+    full_prompt = buildPrompt(prompt_base, history_messages)
 
-    response = _call_ollama_generate(
+    response = callOllamaGenerate(
         model_name=model_name,
         prompt=full_prompt,
         image_paths=images_paths,
     )
 
     try:
-        _append_llm_log(
+        appendLlmLog(
             log_file=log_file,
             model_name=model_name,
             prompt=full_prompt,
             image_paths=images_paths,
             response=response,
         )
-    except Exception as e:
-        print(f"[!] Error al escribir en el log de LLM: {e}")
+    except Exception as error:
+        print(f"[!] Error al escribir en el log de LLM: {error}")
 
     return response
