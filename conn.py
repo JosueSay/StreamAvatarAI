@@ -116,10 +116,6 @@ def getConfig():
     if obs_password is None:
         raise EnvironmentError("La variable OBS_PASSWORD no está definida en el entorno")
 
-    llama_models_dir = os.getenv("LLAMA_MODELS_CONTAINER_DIR")
-    if not llama_models_dir:
-        raise EnvironmentError("LLAMA_MODELS_CONTAINER_DIR no está definida en el entorno")
-
     # puede ser vacío
     app_port = os.getenv("APP_PORT")
 
@@ -130,7 +126,6 @@ def getConfig():
         "obs_host": obs_host,
         "obs_port": obs_port,
         "obs_password": obs_password,
-        "llama_models_dir": llama_models_dir,
         "app_port": app_port,
         "path_ip_file": path_ip_file,
     }
