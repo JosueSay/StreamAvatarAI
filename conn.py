@@ -1,11 +1,11 @@
 import os
 import re
 from obswebsocket import obsws, requests
-from config_loader import loadConfig
+from config_loader import getConfigManager
 
 
 def isRunningInDocker():
-    # detecta si el código se está ejecutando dentro de un contenedor docker
+    # Determina si el proceso se está ejecutando dentro de un contenedor Docker.
     if os.path.exists("/.dockerenv"):
         return True
 
@@ -21,24 +21,24 @@ def isRunningInDocker():
 
 
 def assertRunningInDocker():
-    # obliga a que el proyecto se ejecute dentro del contenedor
+    # Obliga a que el proyecto se ejecute dentro de un contenedor Docker.
     if not isRunningInDocker():
         hint = (
-            "\n❌ Este proyecto debe ejecutarse dentro del contenedor Docker.\n"
+            "\nEste proyecto debe ejecutarse dentro del contenedor Docker.\n"
             "Usa los scripts:\n"
-            "  ./scripts/shell/docker/start.sh   (inicia el contenedor)\n"
-            "  ./scripts/shell/docker/shell.sh   (entra al contenedor)\n"
+            "\t./scripts/shell/docker/start.sh   (inicia el contenedor)\n"
+            "\t./scripts/shell/docker/shell.sh   (entra al contenedor)\n"
         )
         raise RuntimeError(hint)
 
 
 def getIpFromLog(log_path):
+    # Lee el archivo de log de red de Windows y devuelve una dirección IPv4 detectada.
     print(f"Leyendo archivo de red: {log_path}")
 
     if not os.path.exists(log_path):
         raise FileNotFoundError(f"No se encontró el archivo de IP: {log_path}")
 
-    # detectar BOM
     with open(log_path, "rb") as raw:
         start = raw.read(4)
 
@@ -51,22 +51,19 @@ def getIpFromLog(log_path):
 
     print(f"\n\t- Encoding detectado: {encoding}")
 
-    # leer con encoding correcto
     with open(log_path, "r", encoding=encoding, errors="ignore") as file:
         content = file.read()
 
     lines = content.splitlines()
 
-    # mostrar líneas relevantes
     print("\t- Buscando líneas que contengan IPv4:")
-    matches = [l for l in lines if "IPv4" in l]
+    matches = [line for line in lines if "IPv4" in line]
     if matches:
-        for l in matches:
-            print("\t\t->" + l)
+        for line in matches:
+            print("\t\t->" + line)
     else:
         print("\t\t(Sin coincidencias)")
 
-    # regex principal
     regex = r"(Dirección\s+IPv4|IPv4 Address).*?((\d{1,3}\.){3}\d{1,3})"
     match_line = re.search(regex, content)
 
@@ -75,12 +72,11 @@ def getIpFromLog(log_path):
         print(f"\t- IP detectada correctamente: {ip}")
         return ip
 
-    # fallback global
     all_ips = re.findall(r"(\d{1,3}(?:\.\d{1,3}){3})", content)
     if all_ips:
         print("\t- IPs encontradas en fallback:")
         for ip in all_ips:
-            print("   → " + ip)
+            print("\t → " + ip)
 
         selected = all_ips[0]
         print(f"\t- Usando la primera IP encontrada: {selected}")
@@ -90,36 +86,24 @@ def getIpFromLog(log_path):
 
 
 def getConfig():
+    # Construye la configuración necesaria para conectar con OBS usando YAML y entorno.
     assertRunningInDocker()
 
-    config_yaml = loadConfig()
-    app_config = config_yaml.get("app")
+    config_manager = getConfigManager()
+    app_config = config_manager.getSection("app")
 
-    if not app_config:
-        raise KeyError("config.yaml no contiene la sección 'app'")
+    path_ip_file = app_config["path_ip_file"]
 
-    path_ip_file = app_config.get("path_ip_file")
-    if not path_ip_file:
-        raise KeyError("config.yaml no define 'app.path_ip_file'")
-
-    # variables obligatorias
-    obs_port_value = os.getenv("OBS_PORT")
-    if not obs_port_value:
-        raise EnvironmentError("La variable OBS_PORT no está definida en el entorno")
-
+    obs_port_value = config_manager.requireEnv("OBS_PORT")
     try:
         obs_port = int(obs_port_value)
     except ValueError:
         raise ValueError(f"OBS_PORT debe ser entero, recibido: {obs_port_value}")
 
-    obs_password = os.getenv("OBS_PASSWORD")
-    if obs_password is None:
-        raise EnvironmentError("La variable OBS_PASSWORD no está definida en el entorno")
+    obs_password = config_manager.requireEnv("OBS_PASSWORD", allow_empty=True)
 
-    # puede ser vacío
-    app_port = os.getenv("APP_PORT")
+    app_port = config_manager.getEnv("APP_PORT")
 
-    # obtener la ip del host real
     obs_host = getIpFromLog(path_ip_file)
 
     return {
@@ -132,7 +116,7 @@ def getConfig():
 
 
 def printObsVersion(version):
-    # imprime detalles útiles de la versión de OBS
+    # Imprime detalles útiles de la versión de OBS y del WebSocket.
     print("✔ Conexión exitosa")
     print("\n\t Información de OBS:")
     print(f"\t\t- OBS versión: {version.getObsVersion()}")
@@ -143,6 +127,7 @@ def printObsVersion(version):
 
 
 def createObsConnection():
+    # Crea una conexión WebSocket con OBS y devuelve el cliente y la configuración usada.
     config = getConfig()
 
     obs_host = config["obs_host"]
@@ -157,9 +142,8 @@ def createObsConnection():
         ws.connect()
         version = ws.call(requests.GetVersion())
         printObsVersion(version)
-
     except Exception as error:
-        print("\n❌ Error al conectar a OBS\n")
+        print("\nError al conectar a OBS\n")
 
         print("Posibles causas:")
         print("\t- OBS no está abierto")

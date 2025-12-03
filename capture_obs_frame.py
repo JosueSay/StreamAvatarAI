@@ -2,34 +2,34 @@ import os
 import time
 import base64
 from io import BytesIO
-from typing import List
 
 from PIL import Image
 from obswebsocket import requests
 
-from config_loader import loadConfig
+from config_loader import getConfigManager
+
+
+def isDebugEnabled():
+    # Devuelve true si el modo debug está activo en config.app.debug.
+    app_config = getConfigManager().getSection("app")
+    return bool(app_config["debug"])
 
 
 def getObsCaptureConfig():
-    config_yaml = loadConfig()
-    obs_config = config_yaml.get("obs")
+    # Lee la configuración de captura desde la sección obs de config.yaml.
+    config_manager = getConfigManager()
+    obs_config = config_manager.getSection("obs")
 
-    if not obs_config:
-        raise KeyError("config.yaml no contiene la sección 'obs'")
-
-    capture_source_mode = obs_config.get("capture_source_mode")
-    capture_source_name = obs_config.get("capture_source_name")
-    capture_width = obs_config.get("capture_width")
-    capture_height = obs_config.get("capture_height")
+    capture_source_mode = obs_config["capture_source_mode"]
+    capture_source_name = obs_config["capture_source_name"]
+    capture_width = obs_config["capture_width"]
+    capture_height = obs_config["capture_height"]
 
     if capture_source_mode not in ("program_scene", "source"):
         raise ValueError("obs.capture_source_mode debe ser 'program_scene' o 'source'")
 
     if capture_source_mode == "source" and not capture_source_name:
         raise ValueError("obs.capture_source_name debe definirse cuando capture_source_mode es 'source'")
-
-    if capture_width is None or capture_height is None:
-        raise KeyError("obs.capture_width y obs.capture_height deben estar definidos en config.yaml")
 
     try:
         capture_width = int(capture_width)
@@ -46,20 +46,21 @@ def getObsCaptureConfig():
 
 
 def resolveSourceName(ws, capture_source_mode: str, capture_source_name: str) -> str:
-    # determina el nombre del source/escena desde el cual capturar la imagen
+    # Determina el nombre del source o escena desde el cual capturar la imagen.
     if capture_source_mode == "program_scene":
         current = ws.call(requests.GetCurrentProgramScene())
         scene_name = current.datain["currentProgramSceneName"]
-        print(f"\t- Escena actual de programa: {scene_name}")
+        if isDebugEnabled():
+            print(f"\t- Escena actual de programa: {scene_name}")
         return scene_name
 
-    # capture_source_mode == "source"
-    print(f"\t- Usando source específico: {capture_source_name}")
+    if isDebugEnabled():
+        print(f"\t- Usando source específico: {capture_source_name}")
     return capture_source_name
 
 
 def saveScreenshotFromObs(ws, source_name: str, width: int, height: int, output_path: str):
-    # pide screenshot a obs y guarda en output_path
+    # Pide un screenshot a OBS y lo guarda en output_path.
     response = ws.call(
         requests.GetSourceScreenshot(
             sourceName=source_name,
@@ -82,8 +83,13 @@ def saveScreenshotFromObs(ws, source_name: str, width: int, height: int, output_
         image.close()
 
 
-def captureFrames(ws, frames_dir: str, frames_per_cycle: int, capture_interval_seconds: int) -> List[str]:
-    print(f"\nCapturando {frames_per_cycle} frames desde OBS en: {frames_dir}")
+def captureFrames(ws, frames_dir: str, frames_per_cycle: int, capture_interval_seconds: int) -> list[str]:
+    # Captura N frames desde OBS distribuidos a lo largo de un intervalo fijo.
+    if frames_per_cycle <= 0:
+        raise ValueError("frames_per_cycle debe ser mayor que 0")
+
+    if isDebugEnabled():
+        print(f"\nCapturando {frames_per_cycle} frames desde OBS en: {frames_dir}")
 
     obs_config = getObsCaptureConfig()
 
@@ -92,16 +98,12 @@ def captureFrames(ws, frames_dir: str, frames_per_cycle: int, capture_interval_s
     capture_width = obs_config["capture_width"]
     capture_height = obs_config["capture_height"]
 
-    if frames_per_cycle <= 0:
-        raise ValueError("frames_per_cycle debe ser mayor que 0")
-
-    # repartir las capturas a lo largo de TODO el intervalo
     interval_per_frame = capture_interval_seconds / float(frames_per_cycle)
-
-    frame_paths: List[str] = []
+    frame_paths: list[str] = []
 
     start_time = time.time()
-    print(f"\t- Inicio de captura (timestamp): {start_time:.3f}")
+    if isDebugEnabled():
+        print(f"\t- Inicio de captura (timestamp): {start_time:.3f}")
 
     for index in range(frames_per_cycle):
         frame_start = time.time()
@@ -109,44 +111,46 @@ def captureFrames(ws, frames_dir: str, frames_per_cycle: int, capture_interval_s
         frame_name = f"frame_{index}.png"
         frame_path = os.path.join(frames_dir, frame_name)
 
-        print(f"\t- Capturando frame {index + 1}/{frames_per_cycle}...")
+        if isDebugEnabled():
+            print(f"\t- Capturando frame {index + 1}/{frames_per_cycle}...")
 
         source_name = resolveSourceName(ws, capture_source_mode, capture_source_name)
         saveScreenshotFromObs(ws, source_name, capture_width, capture_height, frame_path)
 
         frame_end = time.time()
         frame_elapsed = frame_end - frame_start
-        print(f"\t\t- Tiempo de captura del frame: {frame_elapsed:.3f} s")
+        if isDebugEnabled():
+            print(f"\t\t- Tiempo de captura del frame: {frame_elapsed:.3f} s")
 
         frame_paths.append(frame_path)
 
-        # calcular el momento objetivo para el siguiente frame
         if index < frames_per_cycle - 1:
             target_time = start_time + (index + 1) * interval_per_frame
             sleep_time = target_time - time.time()
             if sleep_time > 0:
-                print(f"\t\t- Esperando {sleep_time:.3f} s antes del siguiente frame...")
+                if isDebugEnabled():
+                    print(f"\t\t- Esperando {sleep_time:.3f} s antes del siguiente frame...")
                 time.sleep(sleep_time)
 
-    # ---- aquí forzamos a completar el intervalo total ----
     now = time.time()
     elapsed_so_far = now - start_time
     remaining = capture_interval_seconds - elapsed_so_far
     if remaining > 0:
-        print(f"\t- Esperando {remaining:.3f} s para completar el intervalo de captura...")
+        if isDebugEnabled():
+            print(f"\t- Esperando {remaining:.3f} s para completar el intervalo de captura...")
         time.sleep(remaining)
 
     end_time = time.time()
     total_elapsed = end_time - start_time
     diff = total_elapsed - capture_interval_seconds
 
-    print("\t- Frames capturados:")
-    for path in frame_paths:
-        print(f"\t\t-> {path}")
+    if isDebugEnabled():
+        print("\t- Frames capturados:")
+        for path in frame_paths:
+            print(f"\t\t-> {path}")
 
-    print(f"\t- Tiempo total real de captura: {total_elapsed:.3f} s")
-    print(f"\t- Tiempo configurado en YAML: {capture_interval_seconds} s")
-    print(f"\t- Diferencia: {diff:+.3f} s")
+        print(f"\t- Tiempo total real de captura: {total_elapsed:.3f} s")
+        print(f"\t- Tiempo configurado en YAML: {capture_interval_seconds} s")
+        print(f"\t- Diferencia: {diff:+.3f} s")
 
     return frame_paths
-
