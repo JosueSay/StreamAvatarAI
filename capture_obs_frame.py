@@ -88,6 +88,18 @@ def captureFrames(ws, frames_dir: str, frames_per_cycle: int, capture_interval_s
     if frames_per_cycle <= 0:
         raise ValueError("frames_per_cycle debe ser mayor que 0")
 
+    # Limpia PNGs previos para no mezclar frames de ciclos distintos.
+    try:
+        for fname in os.listdir(frames_dir):
+            if fname.lower().endswith(".png"):
+                fpath = os.path.join(frames_dir, fname)
+                if os.path.isfile(fpath):
+                    os.remove(fpath)
+        if isDebugEnabled():
+            print(f"\n\t- Frames PNG previos eliminados en: {frames_dir}")
+    except Exception as error:
+        print(f"\t[!] No se pudieron limpiar los frames previos: {error}")
+
     if isDebugEnabled():
         print(f"\nCapturando {frames_per_cycle} frames desde OBS en: {frames_dir}")
 
@@ -102,17 +114,20 @@ def captureFrames(ws, frames_dir: str, frames_per_cycle: int, capture_interval_s
     frame_paths: list[str] = []
 
     start_time = time.time()
+    timestamp = int(start_time * 1000)  # ms para distinguir ciclos muy seguidos
+
     if isDebugEnabled():
-        print(f"\t- Inicio de captura (timestamp): {start_time:.3f}")
+        print(f"\t- Inicio de captura (timestamp): {start_time:.3f} ({timestamp})")
 
     for index in range(frames_per_cycle):
         frame_start = time.time()
 
-        frame_name = f"frame_{index}.png"
+        # Nombre con timestamp + índice dentro del ciclo
+        frame_name = f"frame_{timestamp}_{index}.png"
         frame_path = os.path.join(frames_dir, frame_name)
 
         if isDebugEnabled():
-            print(f"\t- Capturando frame {index + 1}/{frames_per_cycle}...")
+            print(f"\t- Capturando frame {index + 1}/{frames_per_cycle} -> {frame_name}")
 
         source_name = resolveSourceName(ws, capture_source_mode, capture_source_name)
         saveScreenshotFromObs(ws, source_name, capture_width, capture_height, frame_path)
