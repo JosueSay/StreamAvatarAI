@@ -34,6 +34,8 @@ def runPipeline():
     frames_per_cycle = params["frames_per_cycle"]
     capture_interval_seconds = params["capture_interval_seconds"]
     max_history_messages = params["max_history_messages"]
+    history_enabled = params["history_enabled"]
+    history_persist_file = params["history_persist_file"]
     min_speak_cycles = params["min_speak_cycles"]
     max_speak_cycles = params["max_speak_cycles"]
 
@@ -48,8 +50,11 @@ def runPipeline():
     print(f"\t- Frames por ciclo: {frames_per_cycle}")
     print(f"\t- Intervalo total de captura por ciclo: {capture_interval_seconds} segundos")
     print(f"\t- Máximo de mensajes en historial: {max_history_messages}")
+    print(f"\t- Historial habilitado: {history_enabled}")
+    print(f"\t- Historial persiste en archivo: {history_persist_file}")
     print(f"\t- Ciclos para hablar (min, max): ({min_speak_cycles}, {max_speak_cycles})")
 
+    # limpiar frames previos
     try:
         for fname in os.listdir(frames_dir):
             fpath = os.path.join(frames_dir, fname)
@@ -60,14 +65,17 @@ def runPipeline():
     except Exception as error:
         print(f"\t[!] No se pudieron limpiar los frames: {error}")
 
-    try:
-        with open(history_file, "w", encoding="utf-8"):
-            pass
-        if isDebugEnabled():
-            print(f"\t- Historial reiniciado: {history_file}")
-    except Exception as error:
-        print(f"\t[!] No se pudo reiniciar el historial ({history_file}): {error}")
+    # limpiar historial solo si se persiste y tiene sentido (max_history > 0)
+    if history_persist_file and max_history_messages > 0:
+        try:
+            with open(history_file, "w", encoding="utf-8"):
+                pass
+            if isDebugEnabled():
+                print(f"\t- Historial reiniciado: {history_file}")
+        except Exception as error:
+            print(f"\t[!] No se pudo reiniciar el historial ({history_file}): {error}")
 
+    # limpiar log de LLM
     try:
         with open(llm_log_file, "w", encoding="utf-8"):
             pass
@@ -77,7 +85,7 @@ def runPipeline():
         print(f"\t[!] No se pudo reiniciar el log LLM ({llm_log_file}): {error}")
 
     history_messages: list[str] = []
-    print(f"\t- Mensajes iniciales en historial: {len(history_messages)}")
+    print(f"\t- Mensajes iniciales en historial (memoria): {len(history_messages)}")
 
     ws, _ = createObsConnection()
 
@@ -93,7 +101,7 @@ def runPipeline():
             if isDebugEnabled():
                 print("\n======================== NUEVO CICLO ========================")
 
-            # Si todavía está en cooldown, no capturamos frames, solo esperamos.
+            # Mientras está en cooldown, no capturamos frames ni llamamos al LLM.
             if cycles_until_talk > 0:
                 cycles_until_talk -= 1
                 if isDebugEnabled():
@@ -101,20 +109,35 @@ def runPipeline():
                 time.sleep(capture_interval_seconds)
                 continue
 
-            # Aquí sí toca hablar: capturamos frames del intervalo completo.
+            # Toca hablar: capturamos frames del intervalo completo.
             frame_paths = captureFrames(ws, frames_dir, frames_per_cycle, capture_interval_seconds)
+
+            # Si el historial está deshabilitado o max=0, no lo mandamos al prompt.
+            if history_enabled and max_history_messages > 0:
+                history_for_prompt = history_messages
+            else:
+                history_for_prompt = []
 
             response = runLlm(
                 prompt_base=prompt_base,
                 images_paths=frame_paths,
-                history_messages=history_messages,
+                history_messages=history_for_prompt,
                 log_file=llm_log_file,
             )
 
             sendToTts(response, audio_dir)
 
-            history_messages.append(response)
-            history_messages = saveHistory(history_file, history_messages, max_history_messages)
+            # Actualizar historial solo si está habilitado y max_history_messages > 0
+            if history_enabled and max_history_messages > 0:
+                history_messages.append(response)
+                history_messages = saveHistory(
+                    history_file,
+                    history_messages,
+                    max_history_messages,
+                    history_persist_file,
+                )
+            else:
+                history_messages = []
 
             cycles_until_talk = nextGap()
             if isDebugEnabled():
