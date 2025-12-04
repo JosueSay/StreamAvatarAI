@@ -64,13 +64,30 @@ Sugerencias:
 - `temperature ≈ 0.7–0.9`: estilo más caótico, más variación, más “humano”.
 - `top_p ≈ 0.8–0.95`: valores razonables para mantener coherencia sin perder creatividad.
 
+## Sección `tts`
+
+Parámetros relacionados con el sistema de texto a voz (TTS) externo (Fish Audio).
+
+| Clave             | Tipo   | Ejemplo                                   | Valores válidos                  | Descripción                                                                 |
+|-------------------|--------|-------------------------------------------|----------------------------------|-----------------------------------------------------------------------------|
+| `tts.voice_id`    | string | `"c5570dc3e05b463c9936031e97468b8e"`      | ID válido de voz en Fish Audio   | Identificador público de la voz que usará el avatar para hablar.           |
+| `tts.format`      | string | `"mp3"`                                   | `"mp3"` (recomendado) u otros soportados por Fish Audio | Formato de salida de audio generado por el TTS.                            |
+| `tts.save_audio`  | bool   | `true`                                    | `true` / `false`                 | Indica si se pretende conservar los audios generados en disco.             |
+
+Notas:
+
+- Los archivos generados se guardan en `app.data_dir/app.audio_subdir` (por defecto `data/audio`).
+- Un proceso externo en Windows puede escuchar ese directorio y reproducir los `.mp3` generados.
+
 ## Variables de entorno relacionadas
 
-Aunque no forman parte del YAML (`.env`), la aplicación también depende de estas variables de entorno:
+Aunque no forman parte del YAML (`config.yaml`), la aplicación también depende de estas variables de entorno:
 
-| Variable       | Ejemplo                 | Descripción                                         |
-|----------------|-------------------------|-----------------------------------------------------|
-| `OBS_PORT`     | `4455`                  | Puerto del servidor WebSocket de OBS.                 |
-| `OBS_PASSWORD` | `""` o `"tu_password"`  | Contraseña del WebSocket de OBS, si está configurada. |
-| `APP_PORT`     | `"8000"`                | Puerto HTTP de la app.                              |
-| `OLLAMA_URL`   | `"http://ollama:1234"`  | URL base del servicio de Ollama a usar para el LLM. |
+| Variable          | Ejemplo                      | Descripción                                                         |
+|-------------------|------------------------------|---------------------------------------------------------------------|
+| `OBS_PORT`        | `4455`                       | Puerto del servidor WebSocket de OBS.                              |
+| `OBS_PASSWORD`    | `""` o `"tu_password"`       | Contraseña del WebSocket de OBS, si está configurada.              |
+| `APP_PORT`        | `8000`                       | Puerto HTTP de la app (si se expone un servidor adicional).        |
+| `APP_CONFIG_PATH` | `"/app/config.yaml"`         | Ruta dentro del contenedor del archivo de configuración            |
+| `OLLAMA_URL`      | `http://ollama:11434`        | URL base del servicio de Ollama para el LLM.                       |
+| `FISH_API_KEY`    | `123d45s6a48dsadxzaaaxxx`    | API key del servicio de TTS (Fish Audio) usada para generar la voz del avatar. |

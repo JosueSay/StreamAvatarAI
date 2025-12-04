@@ -74,3 +74,12 @@ llm:
   temperature: 0.7
   # Límite de probabilidad acumulada para muestreo (top-p)
   top_p: 0.9
+
+tts:
+  # ID público de la voz en Fish Audio
+  voice_id: "c5570dc3e05b463c9936031e97468b8e"
+  # Formato de salida de audio
+  format: "mp3"
+  # Activa guardar el audio generado en disco si es true
+  save_audio: true
+
