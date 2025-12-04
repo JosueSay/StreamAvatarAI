@@ -16,6 +16,8 @@ Parámetros generales de la aplicación, rutas y control del pipeline.
 | `app.audio_subdir`      | string    | `"audio"`      | Nombre de subcarpeta           | Subdirectorio dentro de `data_dir` para audios del TTS u otros.            |
 | `app.logs_subdir`       | string    | `"logs"`       | Nombre de subcarpeta           | Subdirectorio dentro de `data_dir` para logs de la aplicación.             |
 | `app.llm_log_file`      | string    | `"llm_calls.log"` | Nombre de archivo           | Archivo JSONL donde se loguean las llamadas al LLM (prompt, imágenes, respuesta). |
+| `history_enabled`      | bool | `false` | `true` / `false` | Habilita o deshabilita completamente el uso de historial en el avatar. Si está en `false`, el LLM siempre responde sin contexto previo, evitando repeticiones forzadas o bucles.      |
+| `history_persist_file` | bool | `false` | `true` / `false` | Controla si el historial se guarda en el archivo `history.txt`. Aunque `history_enabled` esté activo, puedes desactivar la persistencia para que el historial exista solo en memoria. |
 
 ### Pipeline
 

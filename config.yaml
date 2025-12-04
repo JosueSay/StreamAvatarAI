@@ -28,6 +28,12 @@ app:
   # Máximo de mensajes de historial a mantener en memoria y disco
   max_history_messages: 3
 
+  # Habilita o deshabilita el uso de historial en el avatar
+  history_enabled: false
+
+  # Controla si se escribe history.txt en disco
+  history_persist_file: false
+
   # Mínimo de ciclos de captura entre dos intervenciones del avatar
   min_speak_cycles: 30
   # Máximo de ciclos de captura entre dos intervenciones del avatar

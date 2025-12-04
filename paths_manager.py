@@ -41,9 +41,16 @@ def getAppParams():
     return {
         "frames_per_cycle": app_cfg["frames_per_cycle"],
         "capture_interval_seconds": app_cfg["capture_interval_seconds"],
+
+        # control de historial
         "max_history_messages": app_cfg["max_history_messages"],
+        "history_enabled": app_cfg["history_enabled"],
+        "history_persist_file": app_cfg["history_persist_file"],
+
         "min_speak_cycles": app_cfg["min_speak_cycles"],
         "max_speak_cycles": app_cfg["max_speak_cycles"],
+
+        # parámetros del LLM
         "prompt_base": llm_cfg["prompt_base"],
         "llm_temperature": llm_cfg["temperature"],
         "llm_top_p": llm_cfg["top_p"],
