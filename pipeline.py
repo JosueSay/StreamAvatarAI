@@ -1,17 +1,24 @@
 import os
 import random
+import time
 
 from conn import createObsConnection
 from paths_manager import getAppPaths, getAppParams
 from history_manager import saveHistory
 from capture_obs_frame import captureFrames, isDebugEnabled
 from llm_client import runLlm
+from tts_client import synthesizeAndPlay
 
 
-def sendToTts(text: str):
-    # Envía la respuesta generada por el LLM al sistema de TTS (por ahora solo imprime).
+def sendToTts(text: str, audio_dir: str):
+    # Envía la respuesta generada por el LLM al sistema de TTS (genera el mp3 para que Windows lo reproduzca).
     print("\nEnviando respuesta a TTS:")
     print(f"\t- Texto: {text[:120]}...")
+
+    try:
+        synthesizeAndPlay(text, audio_dir)
+    except Exception as error:
+        print(f"[!] Error al usar TTS: {error}")
 
 
 def runPipeline():
@@ -86,24 +93,25 @@ def runPipeline():
             if isDebugEnabled():
                 print("\n======================== NUEVO CICLO ========================")
 
-            frame_paths = captureFrames(ws, frames_dir, frames_per_cycle, capture_interval_seconds)
-
+            # Si todavía está en cooldown, no capturamos frames, solo esperamos.
             if cycles_until_talk > 0:
                 cycles_until_talk -= 1
                 if isDebugEnabled():
                     print(f"\t- Ciclo silencioso. Faltan {cycles_until_talk} ciclos para hablar de nuevo.")
+                time.sleep(capture_interval_seconds)
                 continue
 
-            prompt = prompt_base
+            # Aquí sí toca hablar: capturamos frames del intervalo completo.
+            frame_paths = captureFrames(ws, frames_dir, frames_per_cycle, capture_interval_seconds)
 
             response = runLlm(
-                prompt_base=prompt,
+                prompt_base=prompt_base,
                 images_paths=frame_paths,
                 history_messages=history_messages,
                 log_file=llm_log_file,
             )
 
-            sendToTts(response)
+            sendToTts(response, audio_dir)
 
             history_messages.append(response)
             history_messages = saveHistory(history_file, history_messages, max_history_messages)
@@ -111,7 +119,6 @@ def runPipeline():
             cycles_until_talk = nextGap()
             if isDebugEnabled():
                 print(f"\t- Próxima intervención del avatar en ~{cycles_until_talk} ciclos.")
-                
             else:
                 total_seconds = cycles_until_talk * capture_interval_seconds
                 print(f"\nAvatar en cooldown: hablará de nuevo en {cycles_until_talk} ciclos (~{total_seconds} segundos)\n")
